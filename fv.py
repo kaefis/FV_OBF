@@ -517,7 +517,7 @@ class UltimateObfuscator:
         decompressed_data_name = _rand_ident()
         ns_name = _rand_ident()
         
-        timestamp = datetime.now().strftime("%d/%m/%Y")
+        timestamp = datetime.now().strftime("%d/%m/%Y - %H%M%S")
 
         k_parts_repr = ", ".join(repr(p) for p in self.k_parts)
         iv_parts_repr = ", ".join(repr(p) for p in self.iv_parts)
