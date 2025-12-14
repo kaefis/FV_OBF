@@ -1,7 +1,6 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# FutureVisions Obfuscator - v1.6.0
-
+# FutureVisions Obfuscator - v1.6.3
 
 import ast
 import base64
@@ -159,16 +158,37 @@ class ControlFlowFlattener(ast.NodeTransformer):
         new_body.extend(initializers)
 
         while_body = []
-        total_statements = len(original_body)
+        # Lọc ra các statement có thể flatten được (skip Try, With, etc.)
+        flattenable_statements = []
+        flattenable_indices = []
+        for i, stmt in enumerate(original_body):
+            # Skip các node phức tạp không thể flatten
+            if isinstance(stmt, (ast.Try, ast.With, ast.AsyncFunctionDef, ast.FunctionDef)):
+                continue
+            # Skip nếu statement chứa các node phức tạp
+            if any(isinstance(n, (ast.Try, ast.With, ast.Break, ast.Continue)) for n in ast.walk(stmt)):
+                continue
+            flattenable_statements.append(stmt)
+            flattenable_indices.append(i)
+        
+        # Nếu không có statement nào có thể flatten, return nguyên bản
+        if not flattenable_statements:
+            return node
+        
+        total_statements = len(flattenable_statements)
         junk_count = int(total_statements * 0.75)  
         junk_indices = set(random.sample(range(total_statements), min(junk_count, total_statements)))
         
-        for i, stmt in enumerate(original_body):
+        # Tạo mapping từ index trong flattenable_statements về index gốc
+        original_index_map = {idx: orig_idx for idx, orig_idx in enumerate(flattenable_indices)}
+        
+        for i, stmt in enumerate(flattenable_statements):
+            original_idx = flattenable_indices[i]
             dispatch_if = ast.If(
                 test=ast.Compare(
                     left=ast.Name(id=state_var, ctx=ast.Load()),
                     ops=[ast.Eq()],
-                    comparators=[ast.Constant(value=i)]
+                    comparators=[ast.Constant(value=original_idx)]
                 ),
                 body=[
                     stmt,
@@ -198,12 +218,15 @@ class ControlFlowFlattener(ast.NodeTransformer):
                 )
                 while_body.append(opaque_if)
 
+        # Tính max state value (số statement lớn nhất trong flattenable)
+        max_state = max(flattenable_indices) + 1 if flattenable_indices else 0
+        
         new_body.append(
             ast.While(
                 test=ast.Compare(
                     left=ast.Name(id=state_var, ctx=ast.Load()),
                     ops=[ast.Lt()],
-                    comparators=[ast.Constant(value=len(original_body))]
+                    comparators=[ast.Constant(value=max_state)]
                 ),
                 body=while_body,
                 orelse=[]
@@ -359,7 +382,7 @@ class UltimateObfuscator:
         
         anti_debug_call = f"{anti_debug_name}()" if self.anti_debug else "# Anti-debug disabled"
         vm_check_line = f"{anti_vm_name}()" if self.anti_vm else "# VM detection disabled"
-        junk_calls = f"_ = {junk_func_1}()\n        _ = {junk_func_2}(\"obf\")"
+        junk_calls = f"        _ = {junk_func_1}()\n        _ = {junk_func_2}(\"obf\")"
         junk_funcs_def = f"""def {junk_func_1}():
     v = 0
     for i in range(5):
@@ -642,16 +665,23 @@ def _is_already_obfuscated(filename: str) -> bool:
     try:
         with open(filename, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
-            signatures = [
+            specific_signatures = [
                 "FutureVisions Obfuscator",
                 "Obfuscated by FutureVisions",
-                "from Crypto.Cipher import AES",
+                "Author: 16z",
+            ]
+            obf_patterns = [
                 "marshal.loads",
                 "zlib.decompress",
-                "base64.b85decode"
+                "base64.b85decode",
+                "_decrypt_str",
+                "_decrypt_bytes"
             ]
-            found_signatures = sum(1 for sig in signatures if sig in content)
-            return found_signatures >= 3  # nếu flag 3 cái trở lên thì coi như là đã obfuscate
+            
+            found_specific = sum(1 for sig in specific_signatures if sig in content)
+            found_patterns = sum(1 for pattern in obf_patterns if pattern in content)
+            
+            return found_specific >= 1 or found_patterns >= 3
     except Exception:
         return False
 
