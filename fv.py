@@ -1,6 +1,6 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# FutureVisions Obfuscator - v1.7.0
+# FutureVisions Obfuscator - v1.7.3
 
 
 import ast
@@ -544,10 +544,7 @@ def {junk_func_2}(text="junk"):
 """
 
         loader = f"""# Obfuscated by FutureVisions Obfuscator
-# Author: 16z aka kaefis
-# GitHub: https://github.com/kaefis
 # Time: {timestamp}
-# Don't change ANYTHING or else code wont working
 
 import sys
 import os
@@ -816,19 +813,23 @@ def _is_already_obfuscated(filename: str) -> bool:
                 "FutureVisions Obfuscator",
                 "Obfuscated by FutureVisions",
                 "Author: 16z",
+                time.strftime("%Y%m%d%H%S")
             ]
             obf_patterns = [
                 "marshal.loads",
                 "zlib.decompress",
                 "base64.b85decode",
                 "_decrypt_str",
+                "_rand_ident",
+                "_decode_list",
+                "_decrypt_bytes",
                 "_decrypt_bytes"
             ]
             
             found_specific = sum(1 for sig in specific_signatures if sig in content)
             found_patterns = sum(1 for pattern in obf_patterns if pattern in content)
             
-            return found_specific >= 1 or found_patterns >= 3
+            return found_specific >= 2 or found_patterns >= 4
     except Exception:
         return False
 
@@ -918,11 +919,13 @@ def show_header():
     print(fade.purpleblue(_center_text("GitHub: https://github.com/kaefis")))
     print(fade.purpleblue(_center_text("Author: 16z")))
 
+def clear_screen():
+    os.system("cls" if os.name == "nt" else "clear")
 
 def main():
     while True:
         try:
-            os.system("cls" if os.name == "nt" else "clear")
+            clear_screen()
             show_header()
 
             def _prompt_tab(prompt_text: str) -> str:
@@ -945,7 +948,7 @@ def main():
                 continue_choice = _prompt_tab(fade.purpleblue("[?] Bạn có muốn tiếp tục? (y/n): ")).strip().lower()
                 if continue_choice != "y":
                     time.sleep(2)
-                    os.system("cls" if os.name == "nt" else "clear")
+                    clear_screen()
                     continue
 
             output_prompt = fade.purpleblue("[+] Tên file xuất(có thể bỏ qua): ")
