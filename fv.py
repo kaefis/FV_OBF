@@ -1,6 +1,7 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# FutureVisions Obfuscator - v1.6.3
+# FutureVisions Obfuscator - v1.7.0
+
 
 import ast
 import base64
@@ -158,20 +159,16 @@ class ControlFlowFlattener(ast.NodeTransformer):
         new_body.extend(initializers)
 
         while_body = []
-        # Lọc ra các statement có thể flatten được (skip Try, With, etc.)
         flattenable_statements = []
         flattenable_indices = []
         for i, stmt in enumerate(original_body):
-            # Skip các node phức tạp không thể flatten
             if isinstance(stmt, (ast.Try, ast.With, ast.AsyncFunctionDef, ast.FunctionDef)):
                 continue
-            # Skip nếu statement chứa các node phức tạp
             if any(isinstance(n, (ast.Try, ast.With, ast.Break, ast.Continue)) for n in ast.walk(stmt)):
                 continue
             flattenable_statements.append(stmt)
             flattenable_indices.append(i)
         
-        # Nếu không có statement nào có thể flatten, return nguyên bản
         if not flattenable_statements:
             return node
         
@@ -179,7 +176,6 @@ class ControlFlowFlattener(ast.NodeTransformer):
         junk_count = int(total_statements * 0.75)  
         junk_indices = set(random.sample(range(total_statements), min(junk_count, total_statements)))
         
-        # Tạo mapping từ index trong flattenable_statements về index gốc
         original_index_map = {idx: orig_idx for idx, orig_idx in enumerate(flattenable_indices)}
         
         for i, stmt in enumerate(flattenable_statements):
@@ -218,7 +214,6 @@ class ControlFlowFlattener(ast.NodeTransformer):
                 )
                 while_body.append(opaque_if)
 
-        # Tính max state value (số statement lớn nhất trong flattenable)
         max_state = max(flattenable_indices) + 1 if flattenable_indices else 0
         
         new_body.append(
@@ -235,6 +230,145 @@ class ControlFlowFlattener(ast.NodeTransformer):
 
         node.body = new_body
         return node
+
+
+class ConstantObfuscator(ast.NodeTransformer):
+    """
+    làm 1 phép tính trở nên phức tạp..
+    """
+    def visit_Constant(self, node: ast.Constant):
+        if isinstance(node.value, int):
+            if node.value == 0:
+                return ast.BinOp(left=ast.Constant(1), op=ast.Sub(), right=ast.Constant(1))
+            elif node.value == 1:
+                return ast.BinOp(left=ast.Constant(2), op=ast.Sub(), right=ast.Constant(1))
+            elif node.value > 1 and node.value < 100:
+                a = random.randint(1, node.value - 1) if node.value > 1 else 0
+                b = node.value - a
+                return ast.BinOp(left=ast.Constant(a), op=ast.Add(), right=ast.Constant(b))
+            elif node.value < 0:
+                return ast.UnaryOp(op=ast.USub(), operand=ast.Constant(abs(node.value)))
+        elif isinstance(node.value, bool):
+            if node.value:
+                return ast.Compare(left=ast.Constant(1), ops=[ast.Eq()], comparators=[ast.Constant(1)])
+            else:
+                return ast.Compare(left=ast.Constant(1), ops=[ast.Eq()], comparators=[ast.Constant(0)])
+        elif node.value is None:
+            return ast.Call(func=ast.Name(id='type', ctx=ast.Load()), args=[ast.Constant(None)], keywords=[])
+        return node
+
+
+class DeadCodeInjector(ast.NodeTransformer):
+    """
+    Thêm dead code vào các hàm
+    """
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        self.generic_visit(node)
+        
+        if any(isinstance(n, (ast.Try, ast.With, ast.AsyncFunctionDef)) for n in ast.walk(node)):
+            return node
+        
+        if not node.body:
+            return node
+        
+        dead_vars = []
+        for _ in range(random.randint(1, 3)):
+            var_name = _rand_ident("_dead_", 8)
+            dead_vars.append(ast.Assign(
+                targets=[ast.Name(id=var_name, ctx=ast.Store())],
+                value=ast.BinOp(
+                    left=ast.Constant(random.randint(100, 999)),
+                    op=random.choice([ast.Add(), ast.Sub(), ast.Mult()]),
+                    right=ast.Constant(random.randint(100, 999))
+                )
+            ))
+        
+        dead_ifs = []
+        for _ in range(random.randint(0, 2)):
+            dead_ifs.append(ast.If(
+                test=ast.Compare(
+                    left=ast.Constant(random.randint(1, 100)),
+                    ops=[ast.Eq()],
+                    comparators=[ast.Constant(random.randint(200, 300))]  # Luôn false
+                ),
+                body=[ast.Expr(value=ast.Constant(None))],
+                orelse=[]
+            ))
+        
+        insert_pos = 1 if (node.body and isinstance(node.body[0], ast.Expr) and 
+                          isinstance(node.body[0].value, ast.Constant) and 
+                          isinstance(node.body[0].value.value, str)) else 0
+        
+        node.body[insert_pos:insert_pos] = dead_vars + dead_ifs
+        return node
+
+
+class ImportObfuscator(ast.NodeTransformer):
+    """
+    obfuscate import statements
+    """
+    def visit_Import(self, node: ast.Import):
+        for alias in node.names:
+            if alias.name.startswith('Crypto'):
+                return node
+        
+        new_body = []
+        for alias in node.names:
+            if alias.asname:
+                new_body.append(ast.Assign(
+                    targets=[ast.Name(id=alias.asname, ctx=ast.Store())],
+                    value=ast.Call(
+                        func=ast.Name(id='__import__', ctx=ast.Load()),
+                        args=[ast.Constant(value=alias.name)],
+                        keywords=[]
+                    )
+                ))
+            else:
+                name = alias.name.split('.')[0]
+                new_body.append(ast.Assign(
+                    targets=[ast.Name(id=name, ctx=ast.Store())],
+                    value=ast.Call(
+                        func=ast.Name(id='__import__', ctx=ast.Load()),
+                        args=[ast.Constant(value=alias.name)],
+                        keywords=[]
+                    )
+                ))
+        return new_body if new_body else node
+    
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        if node.module and node.module.startswith('Crypto'):
+            return node
+        
+        if node.module is None:
+            return node
+        
+        new_body = []
+        module_var = _rand_ident("_mod_", 8)
+        
+        new_body.append(ast.Assign(
+            targets=[ast.Name(id=module_var, ctx=ast.Store())],
+            value=ast.Call(
+                func=ast.Name(id='__import__', ctx=ast.Load()),
+                args=[ast.Constant(value=node.module)],
+                keywords=[]
+            )
+        ))
+        
+        for alias in node.names:
+            target_name = alias.asname if alias.asname else alias.name
+            new_body.append(ast.Assign(
+                targets=[ast.Name(id=target_name, ctx=ast.Store())],
+                value=ast.Call(
+                    func=ast.Name(id='getattr', ctx=ast.Load()),
+                    args=[
+                        ast.Name(id=module_var, ctx=ast.Load()),
+                        ast.Constant(value=alias.name)
+                    ],
+                    keywords=[]
+                )
+            ))
+        
+        return new_body if new_body else node
 
 
 class StringEncryptor(ast.NodeTransformer):
@@ -286,12 +420,15 @@ class UltimateObfuscator:
     bắt đầu obfuscate
     """
 
-    def __init__(self, filename: str, encryption_level: int = 2, anti_debug: bool = True, anti_vm: bool = True):
+    def __init__(self, filename: str, encryption_level: int = 2, anti_debug: bool = True, anti_vm: bool = True, 
+                 dead_code: bool = True, import_obf: bool = True):
         self.filename = filename
         self.code = self._read_file()
         self.encryption_level = encryption_level  # 1=basic, 2=standard, 3=maximum
         self.anti_debug = anti_debug  
         self.anti_vm = anti_vm  
+        self.dead_code = dead_code  
+        self.import_obf = import_obf  
         
         self.aes_key = os.urandom(32)  # AES-256
         self.iv = os.urandom(16)       # AES Hash
@@ -328,11 +465,21 @@ class UltimateObfuscator:
         assigned_vars = collector.assigned_vars - collector.global_vars
         arg_names = collector.arg_names
 
-        transformers = [
-            VariableRenamer(assigned_vars, arg_names),
-            ControlFlowFlattener(),
-            StringEncryptor(self.aes_key, self.iv),
-        ]
+        transformers = []
+        
+        if self.import_obf:
+            transformers.append(ImportObfuscator())
+        
+        transformers.append(ConstantObfuscator())
+        
+        transformers.append(VariableRenamer(assigned_vars, arg_names))
+        
+        if self.dead_code:
+            transformers.append(DeadCodeInjector())
+        
+        transformers.append(ControlFlowFlattener())
+        
+        transformers.append(StringEncryptor(self.aes_key, self.iv))
 
         for tr in transformers:
             tree = tr.visit(tree)
@@ -778,18 +925,11 @@ def main():
             os.system("cls" if os.name == "nt" else "clear")
             show_header()
 
-            width = shutil.get_terminal_size(fallback=(80, 20)).columns
-
-            def _visible_len(text: str) -> int:
-                return len(re.sub(r"\x1b\[[0-9;]*m", "", text))
-
-            def _prompt_center(prompt_text: str) -> str:
+            def _prompt_tab(prompt_text: str) -> str:
                 prompt_text = prompt_text.rstrip("\n")
-                visible_prompt = re.sub(r"\x1b\[[0-9;]*m", "", prompt_text)
-                padding = max(int((width - _visible_len(visible_prompt)) / 2), 0)
-                return input(" " * padding + prompt_text)
+                return input("\t" + prompt_text)
             
-            filename = _prompt_center(fade.purpleblue("[+] Path: ")).strip()
+            filename = _prompt_tab(fade.purpleblue("[+] Path: ")).strip()
             if not filename:
                 print(fade.purpleblue(_center_text("Không hợp lệ")))
                 time.sleep(2)
@@ -802,30 +942,38 @@ def main():
             if _is_already_obfuscated(filename):
                 print(fade.purpleblue(_center_text("[!] File này đã từng được obfuscate bởi FutureVisions!")))
                 print(fade.purpleblue(_center_text("[!] Không nên obfuscate lại file đã obfuscate.")))
-                continue_choice = _prompt_center(fade.purpleblue("[?] Bạn có muốn tiếp tục? (y/n): ")).strip().lower()
+                continue_choice = _prompt_tab(fade.purpleblue("[?] Bạn có muốn tiếp tục? (y/n): ")).strip().lower()
                 if continue_choice != "y":
                     time.sleep(2)
                     os.system("cls" if os.name == "nt" else "clear")
                     continue
 
             output_prompt = fade.purpleblue("[+] Tên file xuất(có thể bỏ qua): ")
-            output_file = _prompt_center(output_prompt).strip() or "obfuscated_" + datetime.now().strftime("%Y%m%d%H%M") + ".py"
+            output_file = _prompt_tab(output_prompt).strip() or "obfuscated_" + datetime.now().strftime("%Y%m%d%H%M") + ".py"
 
             compile_exe_prompt = fade.purpleblue("[~][WIP] Compile thành exe? (y/n): ")
-            compile_exe_choice = _prompt_center(compile_exe_prompt).strip().lower().startswith("y")
+            compile_exe_choice = _prompt_tab(compile_exe_prompt).strip().lower().startswith("y")
             
             one_line_choice = False
             if not compile_exe_choice:
                 one_line_prompt = fade.purpleblue("[~] 1-line obfuscate?: ")
-                one_line_choice = _prompt_center(one_line_prompt).strip().lower().startswith("y")
+                one_line_choice = _prompt_tab(one_line_prompt).strip().lower().startswith("y")
 
             anti_debug_prompt = fade.purpleblue("[~] Anti-Debug? (y/n): ")
-            anti_debug_choice = _prompt_center(anti_debug_prompt).strip().lower()
+            anti_debug_choice = _prompt_tab(anti_debug_prompt).strip().lower()
             anti_debug_enabled = anti_debug_choice != "n" if anti_debug_choice else True
             
             anti_vm_prompt = fade.purpleblue("[~] Anti-VM? (y/n): ")
-            anti_vm_choice = _prompt_center(anti_vm_prompt).strip().lower()
+            anti_vm_choice = _prompt_tab(anti_vm_prompt).strip().lower()
             anti_vm_enabled = anti_vm_choice != "n" if anti_vm_choice else True
+            
+            dead_code_prompt = fade.purpleblue("[~] Dead Code Injection? (y/n): ")
+            dead_code_choice = _prompt_tab(dead_code_prompt).strip().lower()
+            dead_code_enabled = dead_code_choice != "n" if dead_code_choice else True
+            
+            import_obf_prompt = fade.purpleblue("[~] Import Obfuscation? (y/n): ")
+            import_obf_choice = _prompt_tab(import_obf_prompt).strip().lower()
+            import_obf_enabled = import_obf_choice != "n" if import_obf_choice else True
             
             try:
                 print(fade.purpleblue(_center_text(f"[*] Đang obfuscate file: {filename}")))
@@ -833,7 +981,9 @@ def main():
                     filename, 
                     encryption_level=3, 
                     anti_debug=anti_debug_enabled,
-                    anti_vm=anti_vm_enabled
+                    anti_vm=anti_vm_enabled,
+                    dead_code=dead_code_enabled,
+                    import_obf=import_obf_enabled
                 )
                 obf.obfuscate(output_file=output_file, one_line=one_line_choice)
                 print(fade.purpleblue(_center_text(f"[+] Obfuscate thành công!")))
@@ -858,7 +1008,7 @@ def main():
                     "--name", os.path.splitext(exe_output)[0],
                     ]
                     
-                    # mếu không dùng terminal thì thêm --noconsole
+                    # nếu không dùng terminal thì thêm --noconsole
                     if not uses_terminal:
                         pyinstaller_cmd.append("--noconsole")
                     else:
