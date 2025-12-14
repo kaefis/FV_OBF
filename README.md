@@ -1,2 +1,1 @@
-# FV_OBF
-Python obfuscator
+read me soon!
