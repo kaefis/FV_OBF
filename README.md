@@ -4,7 +4,7 @@
 ## Tại sao cần obfuscation?
 
 Python code có thể dễ dàng đọc được. Obfuscation giúp:
-- Bảo vệ thuật toán và logic kinh doanh
+- Bảo vệ thuật toán và logic
 - Làm khó reverse engineering
 - Ẩn thông tin nhạy cảm trong code
 - Tăng độ phức tạp khi phân tích
@@ -39,8 +39,8 @@ python 1.py
 [+] Tên file xuất: obfuscated_script.py
 [~] Anti-Debug? (y/n): y
 [~] Anti-VM? (y/n): y
-[~] Dead Code Injection? (y/n, mặc định: y): y
-[~] Import Obfuscation? (y/n, mặc định: y): n
+[~] Dead Code Injection? (y/n): y
+[~] Import Obfuscation? (y/n): n
 [~] 1-line obfuscate?: n
 [~][WIP] Compile thành exe? (y/n): n
 ```
