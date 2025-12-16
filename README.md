@@ -1,6 +1,6 @@
 # FutureVisions Obfuscator
-
-
+### Tạm thời ngừng commit do tập trung làm phiên bản v2 - dự kiến ra mắt 20/1/2026
+-----------
 ## Tại sao cần obfuscation?
 
 Python code có thể dễ dàng đọc được. Obfuscation giúp:
