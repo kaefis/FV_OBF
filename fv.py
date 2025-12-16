@@ -1,6 +1,6 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# FutureVisions Obfuscator - v1.7.3
+# FutureVisions Obfuscator - v1.7.4
 
 
 import ast
@@ -35,7 +35,7 @@ def _rand_ident(prefix: str = "_16z_", length: int = 12) -> str:
 
 class VariableCollector(ast.NodeVisitor):
     """
-    Tìm tất cả các biến được gán trong code
+    tìm tất cả các biến được gán trong code
     """
     def __init__(self):
         self.assigned_vars = set()
@@ -641,7 +641,8 @@ def {anti_vm_name}():
         try:
             import socket
             hostname = socket.gethostname().upper()
-            blacklist_hostnames = ['DESKTOP-EIWAI7B', '0CC47AC83802', 'BEE7370C-8C0C-4', 'DESKTOP-ET51AJO', '965543', 'DESKTOP-NAKFFMT', 'WIN-5E07COS9ALR', 'B30F0242-1C6A-4', 'DESKTOP-VRSQLAG', 'Q9IATRKPRH', 'XC64ZB', 'DESKTOP-D019GDM', 'DESKTOP-WI8CLET', 'SERVER1', 'LISA-PC', 'JOHN-PC', 'DESKTOP-B0T93D6', 'DESKTOP-1PYKP29', 'DESKTOP-1Y2433R', 'WILEYPC', 'WORK', '6C4E733F-C2D9-4', 'RALPHS-PC', 'DESKTOP-WG3MYJS', 'DESKTOP-7XC6GEZ', 'DESKTOP-5OV9S0O', 'QarZhrdBpj', 'ORELEEPC', 'ARCHIBALDPC', 'JULIA-PC', 'd1bnJkfVlH', 'NETTYPC', 'DESKTOP-BUGIO', 'DESKTOP-CBGPFEE', 'SERVER-PC', 'TIQIYLA9TW5M', 'DESKTOP-KALVINO', 'COMPNAME_4047', 'DESKTOP-19OLLTD', 'DESKTOP-DE369SE', 'EA8C2E2A-D017-4', 'AIDANPC', 'LUCAS-PC', 'MARCI-PC', 'ACEPC', 'MIKE-PC', 'DESKTOP-IAPKN1P', 'DESKTOP-NTU7VUO', 'LOUISE-PC', 'T00917', 'test42', 'test']
+            blacklist_hostnames = _decode_list("{hostnames_blob}")
+            blacklist_hostnames = [h.upper() for h in blacklist_hostnames]
             if hostname in blacklist_hostnames:
                 raise SystemExit
         except Exception:
