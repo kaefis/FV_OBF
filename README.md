@@ -66,21 +66,6 @@ Lưu ý:
 - KHÔNG chia sẻ key này
 - Lưu key ở nơi an toàn
 
-## So sánh
-
-| Tính năng | FutureVisions | PyArmor | Opy |
-|---------|--------------|---------|-----|
-| Variable Renaming | ✅ | ✅ | ✅ |
-| Control Flow Flattening | ✅ | ❌ | ❌ |
-| String Encryption | ✅ | ✅ | ✅ |
-| Constant Obfuscation | ✅ | ❌ | ❌ |
-| Import Obfuscation | ✅ | ❌ | ❌ |
-| Dead Code Injection | ✅ | ❌ | ❌ |
-| Anti-Debug | ✅ | ✅ | ❌ |
-| Anti-VM | ✅ | ✅ | ❌ |
-| Free | ✅ | ❌ | ✅ |
-| Open Source | ✅ | ❌ | ✅ |
-
 ## Đóng góp
 
 Đóng góp luôn có ích đối với project,fork và tạo pull request
